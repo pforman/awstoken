@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# NOTE: This file shoud be sourced, not run as a script.
+#       It registers a function, because the setup requires modifying
+#       the shell's environment with the returned token.
+
+# WARNING: This function will reset or mutate the following variables.
+#          To use MFA tokens, that's its job.  Be aware.
+#
+#      AWS_ACCESS_KEY_ID
+#      AWS_SECRET_ACCESS_KEY
+#      AWS_SESSION_TOKEN
+#      AWS_ACCESS_KEY
+#      AWS_SECRET_KEY
+#      AWS_DELEGATION_TOKEN
+
+# Configuration: The function respects the following variables
+#
+#      AWS_TOKEN_USER - The username of the IAM account we request tokens for.
+#                       Defaults to $USER, the local username.
+#      AWS_TOKEN_PROFILE - The aws-cli profile used for access/secret keys
+#
+#      The AWS_TOKEN_PROFILE can also be specified as an argument, to enable
+#      switching between profiles easily.
+   
+function awstoken {
+
+  local usage_string="Usage: awstoken MFA_TOKEN_CODE [PROFILE_NAME]"
+
+  # This should be your AWS account number.  Change as necessary.
+  local awsaccount=123456789123
+
+  # This is the requested duration.  The IAM policy will enforce its own setings.
+  # Reset if necessary, but 3600 seconds is probably acceptable.
+  local duration=3600
+
+  # Default to IAM user of the same username, and "default" aws-cli profile.
+  local token_user=$USER
+  local token_profile='default'
+
+  # Check env variables to override these if necessary.
+  if [[ -n "$AWS_TOKEN_USER" ]]; then
+    token_user=$AWS_TOKEN_USER
+  fi 
+
+  if [[ -n "$AWS_TOKEN_PROFILE" ]]; then
+    token_profile=$AWS_TOKEN_PROFILE
+  fi 
+
+  local awsarn="arn:aws:iam::${awsaccount}:mfa/${token_user}"
+
+  # Try to find the Python CLI
+  local aws_cli=`which aws`
+
+  if [[ -z "$aws_cli" ]]; then
+    echo $usage_string
+    echo "Error: AWS CLI is not found, make sure 'aws' is installed."
+    return 1
+  fi
+
+  if [[ $# -lt 1  ]]; then
+    echo $usage_string
+    echo "Error: No token code provided."
+    return 2
+  fi
+
+  if [[ $# -gt 2  ]]; then
+    echo $usage_string
+    echo "Error: Too many arguments provided."
+    return 2
+  fi
+
+  # Verify the token code is numeric and six digits.
+  if ! [[ $1 =~ ^[0-9]{6}$ ]]; then
+    echo $usage_string
+    echo "Error: Misformatted token code provided.  Codes should be six digits."
+    return 3
+  fi
+
+  local mfa_token_code=$1
+
+  if [[ -n "$2" ]]; then
+    token_profile=$2
+  fi
+
+  echo "AWS-CLI Profile: $token_profile"
+  echo "MFA ARN: $awsarn"
+
+  ##
+  ## Point of no return, we're about to work on the environment.
+  ## Make sure eveything is good.
+  ##
+
+  # Unset these variables, we're about to replace them.
+  # They're likely to be expired anyway.
+  unset AWS_ACCESS_KEY_ID
+  unset AWS_SECRET_ACCESS_KEY
+  unset AWS_SESSION_TOKEN
+
+  # These are the EC2 variables, we're replacing them as well
+  unset AWS_ACCESS_KEY
+  unset AWS_SECRET_KEY
+  unset AWS_DELEGATION_TOKEN
+
+  # This is the call using your original credentials.
+  local result=$($aws_cli --profile $token_profile sts get-session-token --duration $duration \
+    --serial-number $awsarn --token-code $mfa_token_code --output text )
+
+  if ! [[ $result =~ ^CREDENTIALS ]]; then
+    echo "WARNING: Error retrieving token.  Credentials are not set, API calls will *not* succeed."
+    return 1
+  fi
+
+  local aws_tmp_key=$(echo "$result" | awk '{print $2}')
+  local aws_tmp_secret=$(echo "$result" | awk '{print $4}')
+  local aws_tmp_token=$(echo "$result" | awk '{print $5}')
+
+  # now set these for things that need them
+  # First, "aws" cli
+  export AWS_ACCESS_KEY_ID=$aws_tmp_key
+  export AWS_SECRET_ACCESS_KEY=$aws_tmp_secret
+  export AWS_SESSION_TOKEN=$aws_tmp_token
+
+  # "ec2-*" tools have totally different names.  Y u so crazy?
+  export AWS_ACCESS_KEY=$aws_tmp_key
+  export AWS_SECRET_KEY=$aws_tmp_secret
+  export AWS_DELEGATION_TOKEN=$aws_tmp_token
+
+  echo "Results are set!"
+}

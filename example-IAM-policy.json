@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "NotAction": "iam:*",
+      "Resource": "*",
+      "Condition": {"Bool": {"aws:MultiFactorAuthPresent": "true"}}
+    },
+   {
+      "Effect": "Deny",
+      "Action": ["*"],
+      "Resource": ["*"],
+      "Condition": {"Bool": {"aws:MultiFactorAuthPresent": "false"}}
+    },
+    {
+      "Effect": "Deny",
+      "Action": ["*"],
+      "Resource": ["*"],
+      "Condition": {"NumericGreaterThan": {"aws:MultiFactorAuthAge": "3600"}}
+    }
+  ]
+}
