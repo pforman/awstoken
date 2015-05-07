@@ -6,9 +6,9 @@ This assumes your IAM account is set up with an MFA device.
 
 There are probably many like this, but this one is what I use.
 
-*You'll need to set your own account id in the script.*
+*You'll need to set your own account id in the script or set an environment variable.*
 
-That could be extracted as an environment variable, but mine doesn't change, so I set it in the script.  It's at the top.  The account ID is necessary for the STS call, because it uses an ARN (Amazon Resource Name) to identify the user.
+The account ID is necessary for the STS call, because it uses an ARN (Amazon Resource Name) to identify the user.  If you only use one account, it can be set in the script, but exporting the AWS_TOKEN_ACCOUNT variable is best.  A default value is set in the script, which *will* trigger a warning if used.
 
 ## Usage 
 ```
@@ -32,9 +32,10 @@ awstoken works by acquiring temporary credentials and resetting your shell envir
 ## Configuration
 The awstoken function respects the following variables
 
+-      AWS_TOKEN_ACCOUNT - The AWS account number.  This should be numeric, not a readable alias.
 -      AWS_TOKEN_USER - The username of the IAM account we request tokens for. Defaults to $USER, the local username.
 -      AWS_TOKEN_PROFILE - The aws-cli profile used for access/secret keys
 
 The AWS_TOKEN_PROFILE can also be specified as an optional second argument, to enable switching between profiles easily.
 
-*The account ID provided in the script is bogus.  You must edit it to use your own account ID.*
+*The account ID provided in the script is bogus.  You must edit it or set the AWS_TOKEN_ACCOUNT variable to use your own account ID.*

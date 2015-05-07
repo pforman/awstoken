@@ -19,6 +19,8 @@
 #      AWS_TOKEN_USER - The username of the IAM account we request tokens for.
 #                       Defaults to $USER, the local username.
 #      AWS_TOKEN_PROFILE - The aws-cli profile used for access/secret keys
+#      AWS_TOKEN_ACCOUNT - The aws account, which should be numeric for IAM
+#                          lookups.  If you only use one, you can set it here.
 #
 #      The AWS_TOKEN_PROFILE can also be specified as an argument, to enable
 #      switching between profiles easily.
@@ -28,7 +30,7 @@ function awstoken {
   local usage_string="Usage: awstoken MFA_TOKEN_CODE [PROFILE_NAME]"
 
   # This should be your AWS account number.  Change as necessary.
-  local awsaccount=123456789123
+  local token_account=123456789123
 
   # This is the requested duration.  The IAM policy will enforce its own setings.
   # Reset if necessary, but 3600 seconds is probably acceptable.
@@ -47,7 +49,11 @@ function awstoken {
     token_profile=$AWS_TOKEN_PROFILE
   fi 
 
-  local awsarn="arn:aws:iam::${awsaccount}:mfa/${token_user}"
+  if [[ -n "$AWS_TOKEN_ACCOUNT" ]]; then
+    token_account=$AWS_TOKEN_ACCOUNT
+  fi
+
+  local awsarn="arn:aws:iam::${token_account}:mfa/${token_user}"
 
   # Try to find the Python CLI
   local aws_cli=`which aws`
@@ -75,6 +81,20 @@ function awstoken {
     echo $usage_string
     echo "Error: Misformatted token code provided.  Codes should be six digits."
     return 3
+  fi
+
+  # Verify the account number is numeric and twelve digits.
+  if ! [[ $token_account =~ ^[0-9]{12}$ ]]; then
+    echo $usage_string
+    echo "Error: Misformatted account number provided.  Accounts should be twelve digits."
+    return 4
+  fi
+
+  # Verify the bogus account number is changed.
+  if [[ "$token_account" == "123456789123" ]]; then
+    echo $usage_string
+    echo "Error: Example account number still in use.  Set AWS_TOKEN_ACCOUNT or modify the script."
+    return 4
   fi
 
   local mfa_token_code=$1
