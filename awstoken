@@ -123,8 +123,8 @@ function awstoken {
   unset AWS_DELEGATION_TOKEN
 
   # This is the call using your original credentials.
-  local result=$($aws_cli --profile $token_profile sts get-session-token --duration $duration \
-    --serial-number $awsarn --token-code $mfa_token_code --output text )
+  local result="$($aws_cli --profile $token_profile sts get-session-token --duration $duration \
+    --serial-number $awsarn --token-code $mfa_token_code --output text )"
 
   if ! [[ $result =~ ^CREDENTIALS ]]; then
     echo "WARNING: Error retrieving token.  Credentials are not set, API calls will *not* succeed."
